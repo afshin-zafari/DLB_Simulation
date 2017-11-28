@@ -43,7 +43,7 @@ namespace dtsw{
     int size(){return rows*cols;}
     /*---------------------------------------------------------------------------*/
     void getExistingMemoryInfo(byte **b, int *s, int *l){
-      LOG_INFO(0*LOG_DTSW,"Reported memory:%p with size %d for data %s.\n",
+      LOG_INFO(0,"Reported memory:%p with size %d for data %s.\n",
 	       memory_p,mem_size_in_bytes,getName().c_str());
       *b = (byte *)memory_p;
       *s = mem_size_in_bytes;
@@ -58,14 +58,7 @@ namespace dtsw{
     int get_cols(){return cols;}
     int get_block_row(){return row_idx;}
     /*---------------------------------------------------------------------------*/
-    void partition_2nd_level(int nby,int nbx){
-      for(auto d: Dlist){
-	LOG_INFO(0*LOG_DTSW,"%s(%d,%d) partitioned.\n",d->name.c_str(),d->row_idx,d->col_idx);
-	if (d->sg_data)
-	  d->sg_data->partition_data(*d,nby,nbx);
-	else
-	  LOG_INFO(LOG_DTSW,"no sg data. \n");
-      }
+    void partition_2nd_level(int nby,int nbx){      
     }
     /*---------------------------------------------------------------------------*/
     byte *get_memory(){return memory_p;}

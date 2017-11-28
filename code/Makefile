@@ -68,7 +68,7 @@ $(objects_rel):  $(outdir_rel)/%.o:  $(SOURCE_DIR)/%.cpp
 	@$(CPP) -c -o $@ $< $(COMP_FLAGS) -DLOG_DTSW=0
 
 clean: 
-	rm $(outdir)/*.o $(appfile) $(outdir_rel)/*.o $(appfile_rel)
+	rm -f $(outdir)/*.o $(appfile) $(outdir_rel)/*.o $(appfile_rel)
 copy:
 	cp $(appfile) /crex1/proj/snic2017-7-18/nobackup/DLBSim/bin
 	cp $(appfile_rel) /crex1/proj/snic2017-7-18/nobackup/DLBSim/bin

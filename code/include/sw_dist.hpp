@@ -5,14 +5,13 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
-#include "dt_addtask.hpp"
 #include "sg_taskbase.hpp"
-#include "dt_rhstask.hpp"
-#include "dt_steptask.hpp"
-#include "dt_difftask.hpp"
 #include "dt_timestepstask.hpp"
 #include "ductteip.hpp"
 #include "sg/superglue.hpp"
+#ifndef LOG_DTSW
+#define LOG_DTSW 0x0FFFFFFFF
+#endif
 
 namespace dtsw{
   
