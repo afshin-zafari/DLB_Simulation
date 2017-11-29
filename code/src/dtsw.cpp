@@ -1,12 +1,11 @@
 #include "dtsw.hpp"
 //#include "util.hpp"
-#define LOG_DTSW_DATA 0
+#define LOG_DLBSIM 0xFFFFFFFF
+#define LOG_DTSW_DATA 0 
 namespace dtsw{
   /*----------------------------------------*/
   Parameters_t Parameters;
-  Data *F1,*F2,*F3,*F4;
-  Data *H1,*H2,*H3,*H4;
-  Data *H,*T,*D;
+  Data *A,*B,*C;
   SWAlgorithm *sw_engine;
   /*----------------------------------------------------*/
   void runStep(SWTask*);
@@ -15,39 +14,65 @@ namespace dtsw{
   /*----------------------------------------*/
   /*----------------------------------------*/
   void parse_args(int argc,char *argv[]){
-    Parameters.partition_level[0].M              = config.M;
-    Parameters.partition_level[0].N              = config.N;
-    Parameters.partition_level[0].blocks_per_row = 1;
-    Parameters.partition_level[0].blocks_per_col = 1;
-    
-    Parameters.partition_level[1].M              = config.M / config.Mb;
-    Parameters.partition_level[1].N              = config.N / config.Nb;
-    Parameters.partition_level[1].blocks_per_row = config.Mb;
-    Parameters.partition_level[1].blocks_per_col = config.Nb;
+    Parameters.M          = 1    ; // MB
+    Parameters.W          = 1000 ; // miliseconds
+    Parameters.lambda_bar = 10   ; // min DT tasks running
 
-    Parameters.partition_level[2].M              = config.M / config.Mb / config.mb;
-    Parameters.partition_level[2].N              = config.N / config.Nb / config.nb;
-    Parameters.partition_level[2].blocks_per_row = config.mb;
-    Parameters.partition_level[2].blocks_per_col = config.nb;
-
-    Parameters.P = config.P;
-    Parameters.p = config.p;
-    Parameters.q = config.q;
-    
-    
+    for(int i=0;i<argc;i++){
+      if(strcmp(argv[i],"-lambda") ==0){
+	Parameters.lambda_bar = atoi(argv[++i]);
+      }
+      if(strcmp(argv[i],"-K") ==0){
+	Parameters.K = atoi(argv[++i]);
+      }
+      if(strcmp(argv[i],"-M") ==0){
+	Parameters.M = atoi(argv[++i]);
+      }
+      if(strcmp(argv[i],"-P") ==0){
+	Parameters.N = atoi(argv[++i]);
+      }
+      if(strcmp(argv[i],"-W") ==0){
+	Parameters.W = atoi(argv[++i]);
+      }
+      if(strcmp(argv[i],"--iter-no") ==0){
+	Parameters.IterNo = atoi(argv[++i]);
+      }
+    }
+    Parameters.lambda_star = Parameters.N / Parameters.K * Parameters.lambda_bar;
+    LOG_INFO(LOG_DLBSIM,"lambda=%d, lambda_star=%d, M=%d, N=%d, K=%d, W=%d, IterNo=%d.\n",
+	     Parameters.lambda_bar,
+	     Parameters.lambda_star,
+	     Parameters.M,
+	     Parameters.N,
+	     Parameters.K,
+	     Parameters.W,
+	     Parameters.IterNo
+	     );
   }
   /*----------------------------------------*/
   /*----------------------------------------*/
   void init(int argc, char *argv[]){
-
+    parse_args(argc,argv);
+    dtEngine.set_memory_policy(engine::ALL_USER_ALLOCATED);		
+    dtEngine.start(argc,argv);
+    sw_engine = new SWAlgorithm(argc,argv);
+    dtEngine.set_user_context(sw_engine);
+    int r = Parameters.lambda_star * Parameters.K;
+    A = new DTSWData (r,Parameters.M,"A");
+    B = new DTSWData (r,Parameters.M,"B");
+    C = new DTSWData (r,Parameters.M,"C");
   }
   /*----------------------------------------*/
   void finalize(){
     sw_engine->finalize();
+    delete A;
+    delete B;
+    delete C;
     delete sw_engine;
   }
   /*----------------------------------------------------*/
   void run(int argc, char *argv[]){
+    
     TimeStepsTask::D = new IterationData();
     int n = (Parameters.IterNo<10)?Parameters.IterNo:10;
     for(int i=0; i < n; i++){
@@ -65,14 +90,6 @@ namespace dtsw{
       sw_engine->submit(new TimeStepsTask );
       sw_engine->flush();
     }
-    LOG_INFO(LOG_DTSW,"(****)TimeStepTask::fin H(0) version is  write:%s read:%s .\n",
-	     (*H)(0).getWriteVersion().dumpString().c_str(),
-	     (*H)(0).getReadVersion().dumpString().c_str() );
-    LOG_INFO(LOG_DTSW,"(****)TimeStePDATA gt-ver: rd %s, wr %s --- rt-ver: rd %s wr %s\n",
-	     TimeStepsTask::D->getReadVersion().dumpString().c_str(),
-	     TimeStepsTask::D->getWriteVersion().dumpString().c_str() ,
-	     TimeStepsTask::D->getRunTimeVersion(IData::READ).dumpString().c_str(),
-	     TimeStepsTask::D->getRunTimeVersion(IData::WRITE).dumpString().c_str());
   }
   /*----------------------------------------------------*/
   void TimeStepsTask::runKernel(){
@@ -84,17 +101,7 @@ namespace dtsw{
 #else
     runStep(this);
 #endif
-    LOG_INFO(LOG_DTSW,"DT Tasks count:%d.\n",sw_engine->get_tasks_count());
-    LOG_INFO(LOG_DTSW,"(****)TimeStepTask::fin H(0) version is  write:%s read:%s .\n",
-	     (*H)(0).getWriteVersion().dumpString().c_str(),
-	     (*H)(0).getReadVersion().dumpString().c_str() );
-    LOG_INFO(LOG_DTSW,"(****)TimeStePDATA gt-ver: rd %s, wr %s --- rt-ver: rd %s wr %s\n",
-	     TimeStepsTask::D->getReadVersion().dumpString().c_str(),
-	     TimeStepsTask::D->getWriteVersion().dumpString().c_str() ,
-	     TimeStepsTask::D->getRunTimeVersion(IData::READ).dumpString().c_str(),
-	     TimeStepsTask::D->getRunTimeVersion(IData::WRITE).dumpString().c_str());
-    
-    if (sw_engine->get_tasks_count()<=2)// Only time step tasks are added.
+    if (sw_engine->get_tasks_count()<=3)// Only time step tasks are added.
       finished();
     
   }
@@ -124,9 +131,6 @@ namespace dtsw{
 	     TimeStepsTask::D->getWriteVersion().dumpString().c_str() ,
 	     TimeStepsTask::D->getRunTimeVersion(IData::READ).dumpString().c_str(),
 	     TimeStepsTask::D->getRunTimeVersion(IData::WRITE).dumpString().c_str());
-    LOG_INFO(LOG_DTSW,"(****) H(0) version is  write:%s read:%s .\n",
-	     (*H)(0).getWriteVersion().dumpString().c_str(),
-	     (*H)(0).getReadVersion().dumpString().c_str() );
     host = me;
   }
   /*----------------------------------------------------------------*/
@@ -162,6 +166,17 @@ namespace dtsw{
   }
   /*----------------------------------------------------------------*/
   void SGSWData::partition_data(DTSWData &d,int R,int C){
+  }
+  /*----------------------------------------------------------------------------*/
+  DTSWData::DTSWData(int r,int M, const char  *n):IData(n,r,1,static_cast<IContext*>(sw_engine))
+  {
+    if ( getParent())
+      setDataHandle(getParent()->createDataHandle(this));
+    setDataHostPolicy( glbCtx.getDataHostPolicy() ) ;
+    setLocalNumBlocks(config.nb,config.nb);
+   
+    setPartition(r,1);    
+    sw_engine->addInOutData(this);
   }
   /*----------------------------------------------------------------------------*/
   DTSWData::DTSWData (int M, int N, int r,int c, std::string n,int total_size_in_bytes, int item_size_, bool isSparse)

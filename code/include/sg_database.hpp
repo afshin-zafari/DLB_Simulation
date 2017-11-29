@@ -1,7 +1,9 @@
 #ifndef SG_DATABASE_HPP
 #define SG_DATABASE_HPP
 //#include "util.hpp"
-#define LOG_DTSW 1
+#ifndef LOG_DTSW
+#define LOG_DTSW 0
+#endif
 namespace dtsw{
   struct Dimension{
     int num_blocks,num_elems;

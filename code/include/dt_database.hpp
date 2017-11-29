@@ -16,18 +16,11 @@ namespace dtsw{
     int sp_row,sp_col;
     std::string name_dep;
     /*---------------------------------------------------------------------------*/
-    ~DTSWData(){
-      return;
-      for(auto d: Dlist)
-	delete d;
-      if (memory_p)
-	delete memory_p;
-      if(sg_data)
-	delete sg_data;
-    }
+    ~DTSWData(){}
     /*---------------------------------------------------------------------------*/
     DTSWData();
     /*---------------------------------------------------------------------------*/
+    DTSWData ( int r,int M, const char  *n);
     DTSWData (int M, int N, int r,int c, std::string n, int , int , bool isSparse = false);
     void add_nnz(int z){nnz +=z;}
     int get_nnz(){return nnz;}
