@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -A SNIC2017-7-18
+#SBATCH -A SNIC2017-1-448
 #SBATCH -o tests-%j.out
 #SBATCH -p devel
 #SBATCH -t 00:05:00
@@ -14,8 +14,8 @@
 #assert (  P * nt  == -n ) 
 
 k=1;DLB=0
-P=4;p=2;q=2
-nt=5;
+P=1;p=1;q=1
+nt=20;
 
 B=20;b=5
 
@@ -36,7 +36,7 @@ module load gcc openmpi
 JobID=${SLURM_JOB_ID}
 
 app=./bin/gcc_dlbsim_debug
-params="-P $P -p $p -q $q -M $N $B $b -N $N $B $b -t $nt --ipn $ipn -lambda  10 -K 2 -M 2 -W 2000 --iter-no $iter --timeout 2000 " 
+params="-P $P -p $p -q $q -M $N $B $b -N $N $B $b -t $nt --ipn $ipn -lambda 10 -K 1 -W 1000 --iter-no $iter --timeout 2000 " 
 echo "Params: $params"
 
 tempdir=./temp

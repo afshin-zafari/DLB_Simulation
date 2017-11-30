@@ -103,5 +103,30 @@ namespace dtsw{
     }
 
   };
+  /*=========================================*/
+  class DLBTask : public SWTask{
+  private:
+    dtsw::Data *A,*B,*C;
+  public:
+    DLBTask(dtsw::Data &a, dtsw::Data &b, dtsw::Data &c,SWTask *p){
+      A = static_cast<Data *>(&a);
+      B = static_cast<Data *>(&b);
+      C = static_cast<Data *>(&c);
+      
+      host = C->getHost();
+      parent = p;
+      if (p)
+	step_no = p->step_no;
+      child_count = 0 ;
+      if ( host == me )
+	if ( parent )
+	  Atomic::increase(&parent->child_count);
+      setNameWithParent("_Add");
+      *this << *A << *B	>> *C;      
+    }
+    virtual void runKernel();
+    void submit_next_level_tasks(){}
+    void dump(){}
+  };
 }
 #endif //DT_TASKBASE_HPP

@@ -154,6 +154,20 @@ namespace dtsw{
     }
     void run();
   };
-  
+  /*=========================================================*/
+  class SGDLBTask : public SGTask {
+  private:
+    int wait;
+  public:
+    SGDLBTask(int w):wait(w){
+      LOG_INFO(1,"SGDLBTask CTOR, w=%d.\n",w);
+    }
+    void run(){
+      LOG_INFO(1,"wait started.\n");
+      usleep(wait*1000);
+      LOG_INFO(1,"wait finished.\n");
+    }
+    
+  };
 }
 #endif //SG_TASKBASE_HPP

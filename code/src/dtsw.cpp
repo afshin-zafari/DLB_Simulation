@@ -55,12 +55,13 @@ namespace dtsw{
     parse_args(argc,argv);
     dtEngine.set_memory_policy(engine::ALL_USER_ALLOCATED);		
     dtEngine.start(argc,argv);
-    sw_engine = new SWAlgorithm(argc,argv);
+    sw_engine = new SWAlgorithm(20,false);
     dtEngine.set_user_context(sw_engine);
     int r = Parameters.lambda_star * Parameters.K;
     A = new DTSWData (r,Parameters.M,"A");
     B = new DTSWData (r,Parameters.M,"B");
     C = new DTSWData (r,Parameters.M,"C");
+    LOG_INFO(LOG_DLBSIM,"C(1).host=%d, C.rows=%d.\n",(*C)(1).getHost(),C->get_rows());
   }
   /*----------------------------------------*/
   void finalize(){
@@ -101,13 +102,23 @@ namespace dtsw{
 #else
     runStep(this);
 #endif
-    if (sw_engine->get_tasks_count()<=3)// Only time step tasks are added.
+    if (sw_engine->get_tasks_count()<=Parameters.IterNo)// Only time step tasks are added.
       finished();
     
   }
   /*----------------------------------------------------*/
+  void DLBTask::runKernel(){
+    SGDLBTask *t=new SGDLBTask(Parameters.W);  
+    sw_engine->subtask(this,t);
+    set_submitting(false);
+  }
+  /*----------------------------------------------------*/
   void runStep(SWTask *p){
-    return;
+    Data &a=*A,&b=*B,&c=*C;
+    for (int i=0;i<c.get_rows();i++){
+      sw_engine->submit( new DLBTask(a(i),b(i),c(i),p)
+			 );
+    }    
   }
   /*----------------------------------------------------------------*/
   TimeStepsTask::~TimeStepsTask(){
@@ -135,7 +146,7 @@ namespace dtsw{
   }
   /*----------------------------------------------------------------*/
   DTSWData::DTSWData(){      
-    memory_type = USER_ALLOCATED;
+    memory_type = SYSTEM_ALLOCATED;
     host_type=SINGLE_HOST;
     IData::parent_data = NULL;
     setDataHandle( sw_engine->createDataHandle(this));
@@ -168,8 +179,41 @@ namespace dtsw{
   void SGSWData::partition_data(DTSWData &d,int R,int C){
   }
   /*----------------------------------------------------------------------------*/
-  DTSWData::DTSWData(int r,int M, const char  *n):IData(n,r,1,static_cast<IContext*>(sw_engine))
+  DTSWData::DTSWData(int r,int M, const char  *n)//:IData(n,r,1,static_cast<IContext*>(sw_engine))
   {
+    int c=1;
+    setName(n);
+    for(int i=0;i<r;i++){
+      DTSWData*t=new DTSWData;
+      t->row_idx = i;
+      t->col_idx = 0;
+      std::stringstream ss;
+      ss << n << "(" << i <<  ")";
+      t->name.assign(ss.str());
+      t->memory_p = nullptr;
+      /*
+      int partition_size = total_size_in_bytes / r/ c ;
+      t->mem_size_in_bytes = partition_size;
+      t->memory_p = new byte[partition_size];
+      t->mem_size_in_elements = partition_size / item_size_;
+      LOG_INFO(LOG_DTSW_DATA,"Memory :%p L2 mem  size(in bytes):%d (in items count):%d.\n",t->memory_p,t->mem_size_in_bytes, t->mem_size_in_elements);
+      */
+      int B = Parameters.K;
+      t->setHost(i % B);
+      LOG_INFO(LOG_DLBSIM,"Host for %s is set to %d .\n",ss.str().c_str(),i%B);
+      t->setHostType(SINGLE_HOST);
+      //      t->allocateMemory();
+      t->data_memory = dtEngine.newDataMemory();
+      LOG_INFO(LOG_DLBSIM,"Host for %s is set to %d, its memory:%p .\n",ss.str().c_str(),i%B,t->getContentAddress());
+      t->sg_data =nullptr;
+      Dlist.push_back(t);
+    }
+    rows = r;
+    cols = c;
+    row_idx=col_idx = -1;
+    sg_data = nullptr;
+    memory_p = nullptr;
+    /*
     if ( getParent())
       setDataHandle(getParent()->createDataHandle(this));
     setDataHostPolicy( glbCtx.getDataHostPolicy() ) ;
@@ -177,6 +221,7 @@ namespace dtsw{
    
     setPartition(r,1);    
     sw_engine->addInOutData(this);
+    */
   }
   /*----------------------------------------------------------------------------*/
   DTSWData::DTSWData (int M, int N, int r,int c, std::string n,int total_size_in_bytes, int item_size_, bool isSparse)
@@ -265,6 +310,14 @@ namespace dtsw{
 	 <<Parameters.partition_level[2].blocks_per_row << "_"
 	 << me << ".log";
       Trace<Options>::dump(fn.str().c_str());
+    }
+  }
+  /*---------------------------------------------*/
+  void SWTask::set_submitting(bool f){
+    is_submitting = f;
+    if  (!f){
+      sw_engine->submit(new SGSyncTask(this) );
+      LOG_INFO(LOG_DLBSIM,"SyncTask created for %s.\n",getName().c_str());
     }
   }
 }
