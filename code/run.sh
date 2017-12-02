@@ -13,11 +13,21 @@
 #assert ( -N * 20  == -n ) 
 #assert (  P * nt  == -n ) 
 
-k=1;DLB=0
-P=1;p=1;q=1
-nt=20;
+DLB=0
+P=2;p=$P;q=1
+nt=$[ 20 / $P ];
+# 1MB   2M    5M   10M   20M  50M   100M
+x=353; #500; 790; 1118; 1581; 2500;  3535
+M=$[ $x * $x * 8]; 
+K=$[ $P / 2 ] 
+LAMBDA_BAR=5
+LAMBDA_STAR=$[ $P / $K * ${LAMBDA_BAR} ]
+DLB_PARS="--dlb --silent-dur 10 --dlb-threshold ${LAMBDA_BAR} --failure-max 5 -- silent-mode 1 "
+#DLB_PARS=""
 
-B=20;b=5
+B=$[ ${LAMBDA_STAR} * $K]
+N=$[ $x * $B ]
+b=5
 
 ipn=$P;
 iter=3
@@ -27,7 +37,7 @@ iter=3
 
 
 
-N=1000
+
 #====================================
 
 module load gcc openmpi
@@ -36,7 +46,7 @@ module load gcc openmpi
 JobID=${SLURM_JOB_ID}
 
 app=./bin/gcc_dlbsim_debug
-params="-P $P -p $p -q $q -M $N $B $b -N $N $B $b -t $nt --ipn $ipn -lambda 10 -K 1 -W 1000 --iter-no $iter --timeout 2000 " 
+params="-P $P -p $p -q $q -M $N $B $b -N $N $B $b -t $nt --ipn $ipn -lambda ${LAMBDA_BAR} -K $K -W 1000 --iter-no $iter --timeout 100 ${DLB_PARS}" 
 echo "Params: $params"
 
 tempdir=./temp

@@ -53,7 +53,7 @@ namespace dtsw{
   /*----------------------------------------*/
   void init(int argc, char *argv[]){
     parse_args(argc,argv);
-    dtEngine.set_memory_policy(engine::ALL_USER_ALLOCATED);		
+    dtEngine.set_memory_policy(engine::ENGINE_ALLOCATION);		
     dtEngine.start(argc,argv);
     sw_engine = new SWAlgorithm(20,false);
     dtEngine.set_user_context(sw_engine);
@@ -107,6 +107,9 @@ namespace dtsw{
     
   }
   /*----------------------------------------------------*/
+  void DLBTask::static_run(){
+  }
+  /*----------------------------------------------------*/
   void DLBTask::runKernel(){
     SGDLBTask *t=new SGDLBTask(Parameters.W);  
     sw_engine->subtask(this,t);
@@ -158,7 +161,6 @@ namespace dtsw{
     setParent(sw_engine);
     sw_engine->addInputData(this);
     LOG_INFO(LOG_DTSW_DATA,"Data handle for new dtswdata:%d\n",my_data_handle->data_handle);
-    setRunTimeVersion("0.0",0);
   }
   /*----------------------------------------------------------------*/
   IterationData::IterationData(){      
@@ -200,11 +202,18 @@ namespace dtsw{
       */
       int B = Parameters.K;
       t->setHost(i % B);
-      LOG_INFO(LOG_DLBSIM,"Host for %s is set to %d .\n",ss.str().c_str(),i%B);
+      if ( i%B == me)
+	t->setRunTimeVersion("0.0",0);
+      else
+	t->setRunTimeVersion("-1",-1);
+
+
       t->setHostType(SINGLE_HOST);
       //      t->allocateMemory();
+      int  b=Parameters.lambda_star * Parameters.K;
+      t->setContentSize ( M/b*M/b*sizeof(double));
       t->data_memory = dtEngine.newDataMemory();
-      LOG_INFO(LOG_DLBSIM,"Host for %s is set to %d, its memory:%p .\n",ss.str().c_str(),i%B,t->getContentAddress());
+      LOG_INFO(0*LOG_DLBSIM,"Host for %s is set to %d, its memory:%p .\n",ss.str().c_str(),i%B,t->getContentAddress());
       t->sg_data =nullptr;
       Dlist.push_back(t);
     }
@@ -319,6 +328,31 @@ namespace dtsw{
       sw_engine->submit(new SGSyncTask(this) );
       LOG_INFO(LOG_DLBSIM,"SyncTask created for %s.\n",getName().c_str());
     }
+  }
+  /*---------------------------------------------*/
+  DLBTask::DLBTask(dtsw::Data &a, dtsw::Data &b, dtsw::Data &c,SWTask *p){
+    A = static_cast<Data *>(&a);
+    B = static_cast<Data *>(&b);
+    C = static_cast<Data *>(&c);
+      
+    host = C->getHost();
+    task_parent = p;
+    if (p)
+      step_no = p->step_no;
+    child_count = 0 ;
+    if ( host == me )
+      if ( task_parent )
+	Atomic::increase(&task_parent->child_count);
+    setNameWithParent("_Add");
+    message_buffer = new MessageBuffer(getPackSize(),0);
+    parent_context= sw_engine;
+    *this << *A << *B	>> *C;      
+  }
+  /*---------------------------------------------*/
+  void SWAlgorithm::runKernels ( IDuctteipTask *t){
+    LOG_INFO(LOG_DLBSIM,"Imported task :%s.\n",t->getName().c_str());
+    SGDLBTask *sgt=new SGDLBTask(t,Parameters.W);  
+    sw_engine->submit(sgt);
   }
 }
 

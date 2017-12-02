@@ -75,15 +75,13 @@ namespace dtsw{
       }
     }
   /*---------------------------------------------------------*/
-    virtual void runKernels(IDuctteipTask *task )override {
-      std::cout << "runKernels for " << task->get_name() << std::endl;
-    }
+    virtual void runKernels(IDuctteipTask *task )override ;
   /*---------------------------------------------------------*/
     void finalize(){
       dtEngine.finalize();
     }
   /*---------------------------------------------------------*/
-    string getTaskName(unsigned long key){}
+    string getTaskName(unsigned long key){return string("DLB_SIM");}
   /*---------------------------------------------------------*/
     void  taskFinished(DuctTeip_Task *task, TimeUnit dur){}
   /*---------------------------------------------------------*/

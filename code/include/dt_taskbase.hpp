@@ -1,5 +1,8 @@
 #ifndef DT_TASKBASE_HPP
 #define DT_TASKBASE_HPP
+#ifndef LOG_DLBSIM
+#define LOG_DLBSIM 0xFFFFFFFF
+#endif
 
 #include <list>
 #include <atomic>
@@ -12,10 +15,10 @@ namespace dtsw{
   private:
   public:
     bool  is_submitting, sub_tasks_submitted;
-    SWTask *parent;
+    //SWTask *parent;
     SGHandle sg_handle_child,sg_handle_comm;
     //std::atomic<size_t> child_count;
-    int child_count;
+    //int child_count;
     int step_no;
     virtual void dump()=0;
     virtual void runKernel()=0;
@@ -58,7 +61,7 @@ namespace dtsw{
       data_list = new list<DataAccess*>;
       LOG_INFO(LOG_DTSW,"(****)Daxs dlist new %p\n",data_list);
       child_count = 0;
-      parent = nullptr;
+      task_parent = nullptr;
       is_submitting = false;
       sub_tasks_submitted = false;
     }
@@ -68,19 +71,19 @@ namespace dtsw{
     }
     /*------------------------------------------------------------*/
     virtual void finished(){
-      LOG_INFO(LOG_DTSW,"\n");
-      if ( state >= Finished  ) return;
-      setFinished(true);
-      LOG_INFO(LOG_DTSW,"\n");
-      if ( parent){
-	if (  parent->child_count ==0 )
+      LOG_INFO(LOG_DLBSIM,"Task's virtual finished is called for %s, paernt:%p,state:%d, Fin:%d.\n",
+	       getName().c_str(),task_parent,state, Finished);
+      if ( state < Finished  ) 
+	setFinished(true);
+      if ( task_parent){
+	LOG_INFO(LOG_DLBSIM,"Parent child-count: %d .\n",task_parent->child_count);
+	if (  task_parent->child_count ==0 )
 	  return;
-	LOG_INFO(LOG_DTSW,"\n");
-	if ( Atomic::decrease_nv(&parent->child_count) ==0)
+	if ( Atomic::decrease_nv(&task_parent->child_count) ==0)
 	  {
-	    LOG_INFO(LOG_DTSW,"child task :%s is waiting for parent: %s finishes submission.\n",getName().c_str(),parent->getName().c_str());
-	    LOG_INFO(LOG_DTSW, "%s finished from parent's task :%s child_count :%d\n " ,getName().c_str(),parent->getName().c_str(),(int)parent->child_count );
-	    parent->finished();
+	    LOG_INFO(LOG_DTSW,"child task :%s is waiting for parent: %s finishes submission.\n",getName().c_str(),task_parent->getName().c_str());
+	    LOG_INFO(LOG_DTSW, "%s finished from parent's task :%s child_count :%d\n " ,getName().c_str(),task_parent->getName().c_str(),(int)task_parent->child_count );
+	    task_parent->finished();
 	}
       }
       LOG_INFO(LOG_DTSW,"\n");    
@@ -93,12 +96,12 @@ namespace dtsw{
     void set_submitting(bool f);
     /*------------------------------------------------------------*/
     void setNameWithParent(const char*n){
-      if ( !parent ){
+      if ( !task_parent ){
 	setName(n);
 	return;
       }
       std::stringstream ss;
-      ss << parent->getName() << "_" << parent->child_count << n ;
+      ss << task_parent->getName() << "_" << task_parent->child_count << n ;
       setName(ss.str());
     }
 
@@ -108,24 +111,10 @@ namespace dtsw{
   private:
     dtsw::Data *A,*B,*C;
   public:
-    DLBTask(dtsw::Data &a, dtsw::Data &b, dtsw::Data &c,SWTask *p){
-      A = static_cast<Data *>(&a);
-      B = static_cast<Data *>(&b);
-      C = static_cast<Data *>(&c);
-      
-      host = C->getHost();
-      parent = p;
-      if (p)
-	step_no = p->step_no;
-      child_count = 0 ;
-      if ( host == me )
-	if ( parent )
-	  Atomic::increase(&parent->child_count);
-      setNameWithParent("_Add");
-      *this << *A << *B	>> *C;      
-    }
-    virtual void runKernel();
+    DLBTask(dtsw::Data &a, dtsw::Data &b, dtsw::Data &c,SWTask *p);
+    void runKernel();
     void submit_next_level_tasks(){}
+    static void static_run();
     void dump(){}
   };
 }

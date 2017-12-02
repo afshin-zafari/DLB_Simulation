@@ -158,14 +158,26 @@ namespace dtsw{
   class SGDLBTask : public SGTask {
   private:
     int wait;
+    IDuctteipTask *dt_task;
   public:
+    SGDLBTask(IDuctteipTask *d,int w){
+      dt_task = d;
+      wait = w;
+    }
     SGDLBTask(int w):wait(w){
       LOG_INFO(1,"SGDLBTask CTOR, w=%d.\n",w);
+      dt_task = nullptr;
     }
     void run(){
       LOG_INFO(1,"wait started.\n");
       usleep(wait*1000);
       LOG_INFO(1,"wait finished.\n");
+    }
+    ~SGDLBTask(){
+      if(dt_task){
+	LOG_INFO(1,"SGDLBTask DTOR %s.\n",dt_task->getName().c_str());
+	dt_task->setFinished(true);
+      }
     }
     
   };
